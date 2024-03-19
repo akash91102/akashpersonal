@@ -1,0 +1,12 @@
+<div>
+    <button (click)="previousPage()">Previous Page</button>
+    <button (click)="nextPage()">Next Page</button>
+    <span>Page {{currentPage + 1}} of {{totalPages}}</span>
+    <br>
+    <button (click)="zoomIn()">Zoom In</button>
+    <button (click)="zoomOut()">Zoom Out</button>
+    <button (click)="rotateClockwise()">Rotate</button>
+    <button (click)="printImage()">Print</button>
+    <canvas #tiffCanvas></canvas>
+  </div>
+  
