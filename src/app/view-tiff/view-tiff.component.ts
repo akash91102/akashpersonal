@@ -16,6 +16,16 @@ export class ViewTiffComponent implements OnInit,AfterViewInit {
   @ViewChild('pagesContainer') pagesContainer: ElementRef;
   @ViewChild('canvasWrapper', { static: true }) canvasWrapper: ElementRef<HTMLDivElement>;
 
+  @ViewChild('magnifierCanvas') magnifierCanvas: ElementRef<HTMLCanvasElement>;
+  showMagnifier = false;
+  magnifierPosX = 0;
+  magnifierPosY = 0;
+  magnificationFactor = 2;
+  magnifierEnabled = false; 
+
+  drawingMode: 'arrow' | 'circle' | '' = '';
+  drawingStart: { x: number, y: number } = { x: 0, y: 0 };
+
   scale = 1;
   rotation = 0;
   currentPage = 0; // Current page index
@@ -455,7 +465,165 @@ fitToWindow() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
+
+
+adjustContrast(contrast: number = 1) {
+  const canvas = this.tiffCanvas.nativeElement;
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) {
+    return;
+  }
+
+  // Get the current ImageData from the canvas
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  // Adjust contrast formula: f(c) = (259 * (c + 255)) / (255 * (259 - c))
+  const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
+  for (let i = 0; i < data.length; i += 4) { // Iterate over each pixel and adjust
+    data[i] = factor * (data[i] - 128) + 128;     // Red
+    data[i + 1] = factor * (data[i + 1] - 128) + 128; // Green
+    data[i + 2] = factor * (data[i + 2] - 128) + 128; // Blue
+    // Alpha (data[i + 3]) is unchanged
+  }
+
+  // Put the modified ImageData back to the canvas
+  ctx.putImageData(imageData, 0, 0);
+}
+
+
+invertColors() {
+  const canvas = this.tiffCanvas.nativeElement;
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) {
+    return;
+  }
+
+  // Get the current ImageData from the canvas
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  for (let i = 0; i < data.length; i += 4) { // Iterate over each pixel
+    data[i] = 255 - data[i];     // Invert Red
+    data[i + 1] = 255 - data[i + 1]; // Invert Green
+    data[i + 2] = 255 - data[i + 2]; // Invert Blue
+    // Alpha (data[i + 3]) is unchanged
+  }
+
+  // Put the modified ImageData back to the canvas
+  ctx.putImageData(imageData, 0, 0);
+}
+
+
+@HostListener('mousemove', ['$event'])
+  onMouseMove(event: MouseEvent) {
+
+    if (!this.magnifierEnabled) {
+      return; // Do nothing if the magnifier is not enabled
+    }
+
+    this.showMagnifier = true;
+    this.magnifierPosX = event.clientX - 100; // Offset for the magnifier lens
+    this.magnifierPosY = event.clientY - 100;
+
+    this.updateMagnifier(event);
+  }
+
+  @HostListener('mouseleave', ['$event'])
+  onMouseLeave(event: MouseEvent) {
+    this.showMagnifier = false;
+  }
+
+  updateMagnifier(event: MouseEvent) {
+    if (!this.showMagnifier || !this.magnifierCanvas) return;
+
+    const magnifierCtx = this.magnifierCanvas.nativeElement.getContext('2d');
+    const bounds = this.tiffCanvas.nativeElement.getBoundingClientRect();
+
+    // Calculate the position of the cursor relative to the canvas
+    const x = event.clientX - bounds.left;
+    const y = event.clientY - bounds.top;
+
+    // Clear the magnifier canvas
+    magnifierCtx.clearRect(0, 0, this.magnifierCanvas.nativeElement.width, this.magnifierCanvas.nativeElement.height);
+
+    // Draw the magnified portion of the image
+    magnifierCtx.drawImage(
+      this.tiffCanvas.nativeElement,
+      x - (50 / this.magnificationFactor), y - (50 / this.magnificationFactor), // Source coordinates
+      100 / this.magnificationFactor, 100 / this.magnificationFactor, // Source dimensions
+      0, 0, // Destination coordinates
+      200, 200 // Destination dimensions
+    );
+  }
+
+  toggleMagnifier() {
+    this.magnifierEnabled = !this.magnifierEnabled;
+    this.showMagnifier = false; // Hide the magnifier when toggled off
+  }
+
+  startDrawing(event: MouseEvent, mode: 'arrow' | 'circle' | '') {
+    const rect = this.tiffCanvas.nativeElement.getBoundingClientRect();
+    this.drawingMode = mode;
+    this.drawingStart = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  finishDrawing(event: MouseEvent) {
+    if (!this.drawingMode || !this.tiffCanvas) return;
   
+    const ctx = this.tiffCanvas.nativeElement.getContext('2d');
+    if (!ctx) return;
+  
+    const rect = this.tiffCanvas.nativeElement.getBoundingClientRect();
+    const end = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  
+    ctx.beginPath();
+    if (this.drawingMode === 'circle') {
+      const radius = Math.sqrt(Math.pow(end.x - this.drawingStart.x, 2) + Math.pow(end.y - this.drawingStart.y, 2));
+      ctx.arc(this.drawingStart.x, this.drawingStart.y, radius, 0, 2 * Math.PI);
+      ctx.stroke(); // Ensure you're calling stroke() to actually draw the circle
+    }
+    // Handle other drawing modes (like 'arrow') here...
+  
+    this.drawingMode = ''; // Reset drawing mode
+  }
+  
+
+  draw(event: MouseEvent) {
+    if (!this.drawingMode) return;
+
+    const rect = this.tiffCanvas.nativeElement.getBoundingClientRect();
+    const end = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+
+    const ctx = this.tiffCanvas.nativeElement.getContext('2d');
+    if (!ctx) return;
+
+    ctx.beginPath();
+
+    if (this.drawingMode === 'circle') {
+      const radius = Math.sqrt(Math.pow(end.x - this.drawingStart.x, 2) + Math.pow(end.y - this.drawingStart.y, 2));
+      ctx.arc(this.drawingStart.x, this.drawingStart.y, radius, 0, 2 * Math.PI);
+    } else if (this.drawingMode === 'arrow') {
+      // Arrow drawing is more complex and might require a custom implementation
+      // This is a simple line for illustration purposes
+      ctx.moveTo(this.drawingStart.x, this.drawingStart.y);
+      ctx.lineTo(end.x, end.y);
+      // Add more canvas operations here to draw the arrowhead
+    }
+
+    ctx.stroke();
+    this.drawingMode = ''; // Reset drawing mode to stop drawing
+  }
+
+  @HostListener('document:mouseup', ['$event'])
+  onMouseUp(event: MouseEvent) {
+    if (this.drawingMode) {
+      this.draw(event);
+    }
+  }
 
 ngOnDestroy() {
   // Properly deallocate the TIFF object to prevent memory leaks

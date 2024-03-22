@@ -97,3 +97,17 @@ body {
 }
 
 
+.magnifier-lens {
+  position: absolute;
+  border: 2px solid #000;
+  border-radius: 50%;
+  overflow: hidden;
+  width: 200px; /* Diameter of the magnifier lens */
+  height: 200px;
+  pointer-events: none; /* Ignore mouse events on the magnifier lens */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
