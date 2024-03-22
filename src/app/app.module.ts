@@ -5,6 +5,7 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { TiffViewerComponent } from './tiff-viewer/tiff-viewer.component';
 import { ViewTiffComponent } from './view-tiff/view-tiff.component';
+import { FormsModule } from '@angular/forms';
 
 @NgModule({
   declarations: [
@@ -15,6 +16,7 @@ import { ViewTiffComponent } from './view-tiff/view-tiff.component';
   imports: [
     BrowserModule,
     AppRoutingModule,
+    FormsModule 
     
   ],
   providers: [],
